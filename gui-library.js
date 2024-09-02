@@ -49,6 +49,7 @@
     closeButton.style.color = '#eee';
     closeButton.style.padding = '0 5px';
     closeButton.addEventListener('click', () => {
+        console.log('Close button clicked!');
         document.body.removeChild(container);
     });
     topBar.appendChild(closeButton);
@@ -71,16 +72,9 @@
     contentArea.style.overflow = 'auto'; // Make content scrollable if needed
     container.appendChild(contentArea);
 
-    // Create an object to track component instances
-    const components = {
-        dropdowns: {},
-        sliders: {},
-        textInputs: {},
-        textInputWithButtons: {}
-    };
-
-    // Create an object to manage tabs
+    // Create an object to manage tabs and their elements
     const tabs = {};
+    const components = {}; // Track all components by their ID
 
     // Function to create a new tab
     function addTab(tabId, tabTitle) {
@@ -97,6 +91,7 @@
         tabButton.style.whiteSpace = 'nowrap';
 
         tabButton.addEventListener('click', () => {
+            console.log(`Tab ${tabTitle} clicked!`);
             showTab(tabId);
         });
 
@@ -156,13 +151,12 @@
         });
 
         tabs[tabId].tabContent.appendChild(dropdown);
+        components[id] = dropdown; // Track dropdown in components object
 
-        components.dropdowns[id] = {
+        return {
             getValue: () => dropdown.value,
             setValue: (value) => { dropdown.value = value; }
         };
-
-        return components.dropdowns[id];
     }
 
     // Function to add a slider to a specific tab
@@ -198,13 +192,12 @@
         sliderContainer.appendChild(slider);
         sliderContainer.appendChild(sliderLabel);
         tabs[tabId].tabContent.appendChild(slider);
+        components[id] = slider; // Track slider in components object
 
-        components.sliders[id] = {
+        return {
             getValue: () => slider.value,
             setValue: (value) => { slider.value = value; sliderLabel.textContent = `Value: ${value}`; }
         };
-
-        return components.sliders[id];
     }
 
     // Function to add a text input to a specific tab
@@ -225,13 +218,12 @@
         textInput.style.color = '#eee';
 
         tabs[tabId].tabContent.appendChild(textInput);
+        components[id] = textInput; // Track text input in components object
 
-        components.textInputs[id] = {
+        return {
             getValue: () => textInput.value,
             setValue: (value) => { textInput.value = value; }
         };
-
-        return components.textInputs[id];
     }
 
     // Function to add a text input with a button to a specific tab
@@ -256,43 +248,31 @@
         const button = document.createElement('button');
         button.textContent = buttonText;
         button.style.padding = '10px';
+        button.style.marginLeft = '10px';
         button.style.border = 'none';
-        button.style.backgroundColor = '#555';
+        button.style.backgroundColor = '#777';
         button.style.color = '#eee';
         button.style.cursor = 'pointer';
         button.style.borderRadius = '5px';
-        button.style.marginLeft = '10px';
+        button.style.outline = 'none';
 
         button.addEventListener('click', () => {
-            onButtonClick({
-                dropdowns: Object.fromEntries(Object.entries(components.dropdowns).map(([key, comp]) => [key, comp.getValue()])),
-                sliders: Object.fromEntries(Object.entries(components.sliders).map(([key, comp]) => [key, comp.getValue()])),
-                textInputs: Object.fromEntries(Object.entries(components.textInputs).map(([key, comp]) => [key, comp.getValue()])),
-                textInputWithButtonValue: textInput.value
-            });
-        });
-
-        button.addEventListener('mouseover', () => {
-            button.style.backgroundColor = '#666';
-        });
-        button.addEventListener('mouseout', () => {
-            button.style.backgroundColor = '#555';
+            onButtonClick(textInput.value);
         });
 
         wrapper.appendChild(textInput);
         wrapper.appendChild(button);
         tabs[tabId].tabContent.appendChild(wrapper);
+        components[id] = textInput; // Track text input with button in components object
 
-        components.textInputWithButtons[id] = {
+        return {
             getValue: () => textInput.value,
             setValue: (value) => { textInput.value = value; }
         };
-
-        return components.textInputWithButtons[id];
     }
 
     // Function to add a regular button to a specific tab
-    function addButton(tabId, id, buttonText, onButtonClick) {
+    function addRegularButton(tabId, buttonText, callback) {
         if (!tabs[tabId]) {
             console.error('Tab not found:', tabId);
             return;
@@ -300,78 +280,95 @@
 
         const button = document.createElement('button');
         button.textContent = buttonText;
-        button.style.width = '100%';
         button.style.padding = '10px';
+        button.style.marginBottom = '10px';
         button.style.border = 'none';
-        button.style.backgroundColor = '#555';
+        button.style.backgroundColor = '#777';
         button.style.color = '#eee';
         button.style.cursor = 'pointer';
         button.style.borderRadius = '5px';
         button.style.outline = 'none';
-        button.style.marginBottom = '10px';
 
-        button.addEventListener('click', () => {
-            onButtonClick();
-        });
-
-        button.addEventListener('mouseover', () => {
-            button.style.backgroundColor = '#666';
-        });
-        button.addEventListener('mouseout', () => {
-            button.style.backgroundColor = '#555';
-        });
+        button.addEventListener('click', callback);
 
         tabs[tabId].tabContent.appendChild(button);
+    }
+
+    // Function to add a toggle button to a specific tab
+    function addToggleButton(tabId, id, name, initialValue, onToggle) {
+        if (!tabs[tabId]) {
+            console.error('Tab not found:', tabId);
+            return;
+        }
+
+        const toggleButton = document.createElement('button');
+        toggleButton.textContent = `${name}: ${initialValue ? 'ON' : 'OFF'}`;
+        toggleButton.style.padding = '10px';
+        toggleButton.style.marginBottom = '10px';
+        toggleButton.style.border = 'none';
+        toggleButton.style.backgroundColor = initialValue ? '#4CAF50' : '#f44336'; // Green for ON, Red for OFF
+        toggleButton.style.color = '#eee';
+        toggleButton.style.cursor = 'pointer';
+        toggleButton.style.borderRadius = '5px';
+        toggleButton.style.outline = 'none';
+
+        let isOn = initialValue;
+
+        toggleButton.addEventListener('click', () => {
+            isOn = !isOn;
+            toggleButton.textContent = `${name}: ${isOn ? 'ON' : 'OFF'}`;
+            toggleButton.style.backgroundColor = isOn ? '#4CAF50' : '#f44336'; // Update color based on state
+            components[id] = isOn; // Track toggle state in components object
+            if (onToggle) {
+                onToggle(isOn); // Execute the callback function
+            }
+        });
+
+        tabs[tabId].tabContent.appendChild(toggleButton);
+        components[id] = isOn; // Initialize toggle state
 
         return {
-            setOnClick: (newOnClick) => { button.removeEventListener('click', onButtonClick); button.addEventListener('click', newOnClick); }
+            getValue: () => components[id],
+            setValue: (value) => {
+                isOn = value;
+                toggleButton.textContent = `${name}: ${isOn ? 'ON' : 'OFF'}`;
+                toggleButton.style.backgroundColor = isOn ? '#4CAF50' : '#f44336';
+                components[id] = isOn;
+            }
         };
     }
 
-    // Make the container draggable
-    let isDragging = false;
-    let offsetX, offsetY;
+    // Create tabs
+    addTab('tab1', 'Tab 1');
+    addTab('tab2', 'Tab 2');
+    addTab('tab3', 'Tab 3');
 
-    topBar.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        offsetX = e.clientX - container.getBoundingClientRect().left;
-        offsetY = e.clientY - container.getBoundingClientRect().top;
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+    // Show the first tab
+    showTab('tab1');
+
+    // Add controls to tabs
+    addDropdown('tab1', 'dropdown1', [
+        { value: '1', text: 'Option 1' },
+        { value: '2', text: 'Option 2' },
+        { value: '3', text: 'Option 3' }
+    ]);
+    addSlider('tab2', 'slider1', 0, 100, 1, 50);
+    addTextInput('tab3', 'textInput1', 'Enter text...');
+    addTextInputWithButton('tab3', 'textInput2', 'Alert Text', (value) => {
+        alert('Button clicked with text: ' + value);
     });
 
-    function onMouseMove(e) {
-        if (isDragging) {
-            // Get the viewport dimensions
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
+    // Add a regular button to the first tab
+    addRegularButton('tab1', 'Print Specific Values', () => {
+        console.log('Printing specified values:');
+        console.log(`dropdown1: ${components['dropdown1'] ? components['dropdown1'].value : 'Not found'}`);
+        console.log(`slider1: ${components['slider1'] ? components['slider1'].value : 'Not found'}`);
+        console.log(`textInput1: ${components['textInput1'] ? components['textInput1'].value : 'Not found'}`);
+        console.log(`toggleButton1: ${components['toggleButton1'] !== undefined ? components['toggleButton1'] : 'Not found'}`);
+    });
 
-            // Calculate new position
-            let newLeft = e.clientX - offsetX;
-            let newTop = e.clientY - offsetY;
-
-            // Constrain to viewport
-            newLeft = Math.max(0, Math.min(newLeft, viewportWidth - container.offsetWidth));
-            newTop = Math.max(0, Math.min(newTop, viewportHeight - container.offsetHeight));
-
-            container.style.left = `${newLeft}px`;
-            container.style.top = `${newTop}px`;
-        }
-    }
-
-    function onMouseUp() {
-        isDragging = false;
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-    }
-
-    // Expose factory functions and the components object
-    window.addTab = addTab;
-    window.addDropdown = addDropdown;
-    window.addSlider = addSlider;
-    window.addTextInput = addTextInput;
-    window.addTextInputWithButton = addTextInputWithButton;
-    window.addButton = addButton;
-    window.components = components; // Expose the components object for debugging
-    window.showTab = showTab;
+    // Add a toggle button to the second tab
+    addToggleButton('tab2', 'toggleButton1', 'Toggle Feature', false, (value) => {
+        console.log('Toggle button clicked. New state:', value);
+    });
 })();
